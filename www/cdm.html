@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>LesCDM.fr</title>
+
+	<link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.2.1/pure-min.css">
+	<script src="http://codeorigin.jquery.com/jquery-1.10.2.min.js"></script>
+	<script src='//api.tiles.mapbox.com/mapbox.js/v1.2.0/mapbox.js'></script>
+	<link href='//api.tiles.mapbox.com/mapbox.js/v1.2.0/mapbox.css' rel='stylesheet' />
+	
+	<!--[if lte IE 8]>
+	    <link href='//api.tiles.mapbox.com/mapbox.js/v1.2.0/mapbox.ie.css' rel='stylesheet' >
+	<![endif]-->
+	
+	<!--[if lte IE 8]>
+		<link rel="stylesheet" href="http://kaarton.com/pi/wp-content/themes/salient/map/css/MarkerCluster.Default.ie.css" />
+	<![endif]-->
+
+	
+	<script src="http://kaarton.com/pi/wp-content/themes/salient/map/js/markercluster.js"></script>
+	<style>
+		#map { position:absolute; top:0; bottom:0; width:100%; }
+		.leaflet-cluster-anim .leaflet-marker-icon, .leaflet-cluster-anim .leaflet-marker-shadow {
+			-webkit-transition: -webkit-transform 0.2s ease-out, opacity 0.2s ease-in;
+			-moz-transition: -moz-transform 0.2s ease-out, opacity 0.2s ease-in;
+			-o-transition: -o-transform 0.2s ease-out, opacity 0.2s ease-in;
+			transition: transform 0.2s ease-out, opacity 0.2s ease-in;
+		}
+		
+		.marker-cluster-small {
+			background-color: rgba(181, 226, 140, 0.6);
+			}
+		.marker-cluster-small div {
+			background-color: rgba(110, 204, 57, 0.6);
+			}
+		
+		.marker-cluster-medium {
+			background-color: rgba(241, 211, 87, 0.6);
+			}
+		.marker-cluster-medium div {
+			background-color: rgba(240, 194, 12, 0.6);
+			}
+		
+		.marker-cluster-large {
+			background-color: rgba(253, 156, 115, 0.6);
+			}
+		.marker-cluster-large div {
+			background-color: rgba(241, 128, 23, 0.6);
+			}
+		
+		.marker-cluster {
+			background-clip: padding-box;
+			border-radius: 20px;
+		}
+		.marker-cluster div {
+			width: 30px;
+			height: 30px;
+			margin-left: 5px;
+			margin-top: 5px;
+		
+			text-align: center;
+			border-radius: 15px;
+			font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+		}
+		.marker-cluster span {
+			line-height: 30px;
+		}
+
+	</style>
+</head>
+
+<body>
+
+<div id='map'></div>
+<script type='text/javascript'>
+		
+	var dataJSON = (function () {
+    var dataJSON = null;
+	    $.ajax({
+	        'async': false,
+	        'global': false,
+	        'url': 'http://kaarton.fr/cdm/cdm.json',
+	        'dataType': "json",
+	        'success': function (data) {
+	            dataJSON = data;
+	        }
+	    });
+	    return dataJSON;
+	})();
+	
+    
+    L.MarkerClusterGroup.include({
+        fromGeoJSON: function (geojson) {
+            this._geojson = geojson;
+            this.filter();
+        },
+ 
+        filter: function (f) {
+            f = f || function (m) { return true; }
+            var markers = Array();
+            for (var i = 0; i < this._geojson.features.length; i++) {
+                var a = this._geojson.features[i];
+                if (!f(a)) { continue; }
+                var title = a.title;
+                var description = a.description;
+                var marker = L.marker(new L.LatLng(a.geometry.coordinates[0], a.geometry.coordinates[1]), {
+                    icon: L.mapbox.marker.icon({'marker-symbol': 'marker-stroked', 'marker-color': '#3c4e5a'}),
+                    title: title
+                });
+                marker.bindPopup('<b>'+title+'</b><br>'+description);
+                markers.push(marker);
+            }
+            this.clearLayers();
+            this.addLayers(markers);
+        }
+    });
+ 
+ 
+    var map = L.mapbox.map('map', 'krisis.map-64yfiziu',  {markerLayer: false});
+    map.on('error', function (e) {
+        console.log(e);
+    })
+    var cluster = new L.MarkerClusterGroup();
+    map.addLayer(cluster);
+    
+    
+    
+	
+    cluster.fromGeoJSON(dataJSON);
+    map.addLayer(cluster);
+    var filter = L.DomUtil.get('filter');
+    var food = L.DomUtil.get('filter-food');
+    var test = L.DomUtil.get('filter-test');
+    var all = L.DomUtil.get('filter-all');
+	
+	
+	jQuery('.chktax').on('click', function(e) {
+		//console.log(jQuery(":checked.chktax"));
+		var allChecked = {};
+		var cat = [];
+		jQuery(".chktax:checked").each(function(i, elem){
+            var name = elem.name;
+            allChecked[name] = allChecked[name] || [];
+            cat = cat || []
+            allChecked[name].push(elem.value);
+            cat.push(elem.value);
+        });
+		//console.log(cat);
+		
+		
+		cluster.filter(function (m) {
+        	return superbag(m.properties['categories'], cat);
+        });
+		
+	});
+	
+ 
+    
+    
+    L.DomEvent.on(all, 'click', function (e) {
+        cluster.filter();
+    })
+
+
+function superbag(sup, sub) {
+    sup.sort();
+    sub.sort();
+    var i, j;
+    for (i=0,j=0; i<sup.length && j<sub.length;) {
+        if (sup[i] < sub[j]) {
+            ++i;
+        } else if (sup[i] == sub[j]) {
+            ++i; ++j;
+        } else {
+            // sub[j] not in sup, so sub not subbag
+            return false;
+        }
+    }
+    // make sure there are no elements left in sub
+    return j == sub.length;
+}
+
+
+</script>
+
+
+
+</body>
+
+</html>
